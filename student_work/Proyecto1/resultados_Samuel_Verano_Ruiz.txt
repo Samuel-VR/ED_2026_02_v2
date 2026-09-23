@@ -1,0 +1,161 @@
+EVALUACION - Data Stream Processor
+============================================================
+Estudiante : Samuel Verano Ruiz
+Fecha      : 2026-09-23 19:48:05
+Python     : 3.12.13 (Linux)
+Evaluador  : v1.1
+Clase      : DataProcessor (modulo __main__)
+
+== Interfaz y restricciones ==
+
+[PASS ] Define add, process_next, undo, pending y current_value
+[PASS ] Se puede crear DataProcessor() sin argumentos
+[PASS ] __init__ crea una ArrayQueue, un ArrayStack y una list
+[PASS ] No sustituye Queue/Stack por deque u otra estructura
+[PASS ] ArrayQueue y ArrayStack son las del curso (no reimplementadas)
+
+   Interfaz y restricciones: 5/5 OK
+
+== Pruebas obligatorias (1-17) ==
+
+[PASS ] 1. pending() sobre un procesador vacio
+[PASS ] 2. Agregar un registro
+[PASS ] 3. Agregar varios registros
+[PASS ] 4. Procesamiento FIFO
+[PASS ] 5. Procesar un registro
+[PASS ] 6. Procesar varios registros
+[PASS ] 7. Actualizar una variable existente
+[PASS ] 8. Consultar el valor actual
+[PASS ] 9. Realizar un undo()
+[PASS ] 10. Varios undo() consecutivos
+[PASS ] 11. process_next() con la Queue vacia -> Empty
+[PASS ] 12. undo() con historial vacio -> Empty
+[PASS ] 13. Deshacer la creacion de un dato que no existia
+[PASS ] 14. Varios cambios sobre la misma variable
+[PASS ] 15. add() con formato incorrecto
+[PASS ] 16. add() con value no numerico
+[PASS ] 17. current_value() de un sensor/variable nunca procesado -> KeyError
+
+   Pruebas obligatorias (1-17): 17/17 OK
+
+== Casos borde adicionales ==
+
+[PASS ] undo de una creacion entre actualizaciones de otra variable
+[PASS ] Sensores y variables distintos no se mezclan
+[PASS ] Acepta int y float; sigue funcionando tras un Empty
+
+   Casos borde adicionales: 3/3 OK
+
+== Bonus: redo() (opcional) ==
+
+[PASS ] redo() tras un undo
+[PASS ] Varios undo y varios redo (orden inverso)
+[PASS ] redo() recrea un dato que habia sido deshecho
+
+   Bonus: redo() (opcional): 3/3 OK
+
+== RESUMEN ==
+
+   Interfaz y restricciones          5/ 5 OK   0 fallo(s)
+   Pruebas obligatorias (1-17)      17/17 OK   0 fallo(s)
+   Casos borde adicionales           3/ 3 OK   0 fallo(s)
+   Bonus: redo() (opcional)          3/ 3 OK   0 fallo(s)
+
+   Total sin bonus: 25/25 OK
+
+== CODIGO DE LA CLASE ==
+
+class DataProcessor:
+    def __init__(self):
+        self.queue = ArrayQueue()
+        self.stack = ArrayStack()
+        self.lista = []
+        self.redo_stack = ArrayStack()   # para el bonus
+
+    # ---------- 3. add ----------
+    def add(self, record):
+        if not isinstance(record, tuple):
+            raise ValueError("El registro debe ser una tupla (sensor, variable, value).")
+        if len(record) != 3:
+            raise ValueError("El registro debe tener exactamente 3 elementos.")
+        sensor, variable, value = record
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise TypeError("El valor debe ser numérico (int o float).")
+        self.queue.enqueue(record)
+
+    # ---------- 4. process_next ----------
+    def process_next(self):
+        if self.queue.is_empty():
+            raise Empty("No hay registros pendientes.")
+
+        record = self.queue.dequeue()
+        sensor, variable, value = record
+        indice = self._buscar(sensor, variable)
+
+        if indice is None:
+            self.stack.push(("NUEVO", sensor, variable, None, value))
+            self.lista.append(record)
+        else:
+            valor_viejo = self.lista[indice][2]
+            self.stack.push(("ACTUALIZAR", sensor, variable, valor_viejo, value))
+            self.lista[indice] = record
+
+        while not self.redo_stack.is_empty():
+            self.redo_stack.pop()
+
+        return record
+
+    # ---------- 5. undo ----------
+    def undo(self):
+        if self.stack.is_empty():
+            raise Empty("No hay cambios para deshacer.")
+
+        tipo, sensor, variable, valor_viejo, valor_nuevo = self.stack.pop()
+        indice = self._buscar(sensor, variable)
+
+        if tipo == "NUEVO":
+            if indice is not None:
+                self.lista.pop(indice)
+        elif tipo == "ACTUALIZAR":
+            if indice is not None:
+                self.lista[indice] = (sensor, variable, valor_viejo)
+
+        self.redo_stack.push((tipo, sensor, variable, valor_viejo, valor_nuevo))
+
+    # ---------- 6. pending ----------
+    def pending(self):
+        return len(self.queue)
+
+    # ---------- 7. current_value ----------
+    def current_value(self, sensor, variable):
+        indice = self._buscar(sensor, variable)
+        if indice is None:
+            raise KeyError(f"No existe registro para ({sensor}, {variable}).")
+        return self.lista[indice][2]
+
+    # ---------- 12. Bonus: redo ----------
+    def redo(self):
+        if self.redo_stack.is_empty():
+            raise Empty("No hay cambios para rehacer.")
+
+        tipo, sensor, variable, valor_viejo, valor_nuevo = self.redo_stack.pop()
+
+        if tipo == "NUEVO":
+            self.lista.append((sensor, variable, valor_nuevo))
+        elif tipo == "ACTUALIZAR":
+            indice = self._buscar(sensor, variable)
+            if indice is not None:
+                self.lista[indice] = (sensor, variable, valor_nuevo)
+
+        self.stack.push((tipo, sensor, variable, valor_viejo, valor_nuevo))
+
+    # ---------- auxiliar ----------
+    def _buscar(self, sensor, variable):
+        for i, reg in enumerate(self.lista):
+            if reg[0] == sensor and reg[1] == variable:
+                return i
+        return None
+
+== INTEGRIDAD ==
+SHA256 codigo de la clase : 06f49eec21fa910a31b57b551e7a81efb2df35743a9b7f6efc1758f03dcb3fc3
+SHA256 de este informe    : 2006517cd19d57d1a22a1c837f8e8ece6e25d8132ce3b93fa5adc73b7bfc196b
