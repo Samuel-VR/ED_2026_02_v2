@@ -1,0 +1,604 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Laboratorio Dijkstra</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: misma familia visual del Laboratorio BFS y DFS. Grafo oculto y panel de decisión a la izquierda; tabla, bitácora y código a la derecha. */
+/* Colores de estado iguales a la figura del cuaderno: amarillo sale, verde nube, azul cola, rojo árbol. */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --sunken: #e8ecf1;
+  --fg: #172030;
+  --muted: #586579;
+  --line: #c6cfdb;
+  --accent: #1c5fb8;
+  --on-accent: #ffffff;
+  --queue: #cfe3fa;
+  --queue-line: #1c5fb8;
+  --cloud: #a9dcb0;
+  --cloud-line: #1d7a3e;
+  --now: #ffd65c;
+  --now-line: #8a6100;
+  --tree: #d92d27;
+  --ok: #1d7a3e;
+  --ok-soft: #dcf3e2;
+  --bad: #b3261e;
+  --bad-soft: #fbe3e1;
+  --code-hl: #fff3c4;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131b; --surface: #161d28; --sunken: #1d2633; --fg: #e5eaf1; --muted: #9ba7b9; --line: #3a4a60;
+    --accent: #6fb0ff; --on-accent: #0e131b; --queue: #1b3a5e; --queue-line: #6fb0ff;
+    --cloud: #1f5b34; --cloud-line: #5fd08a; --now: #6d5300; --now-line: #ffd65c; --tree: #ff7a72;
+    --ok: #5fd08a; --ok-soft: #123522; --bad: #ff8a80; --bad-soft: #43201d; --code-hl: #3d3514;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #161d28; --sunken: #1d2633; --fg: #e5eaf1; --muted: #9ba7b9; --line: #3a4a60;
+  --accent: #6fb0ff; --on-accent: #0e131b; --queue: #1b3a5e; --queue-line: #6fb0ff;
+  --cloud: #1f5b34; --cloud-line: #5fd08a; --now: #6d5300; --now-line: #ffd65c; --tree: #ff7a72;
+  --ok: #5fd08a; --ok-soft: #123522; --bad: #ff8a80; --bad-soft: #43201d; --code-hl: #3d3514;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 17px; line-height: 1.55; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+  display: grid; gap: 32px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.15rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+.eyebrow, .lbl { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+header { display: grid; gap: 14px; }
+.lead { font-size: 1.15rem; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.field { display: grid; gap: 4px; }
+select, .answer input {
+  font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg);
+}
+.btn {
+  font: inherit; font-weight: 600; font-size: 0.95rem; padding: 8px 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.stats { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.92rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--fg); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.col { display: grid; gap: 16px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+
+/* Grafo */
+.graph-box { background: var(--sunken); border-radius: 8px; }
+svg.graph { width: 100%; height: auto; display: block; }
+.hide { display: none; }
+.edge line { stroke: var(--muted); stroke-width: 2.5; transition: stroke .25s, stroke-width .25s; }
+.edge rect { fill: var(--sunken); }
+.edge text { font-family: var(--font-mono); font-size: 15px; font-weight: 600; fill: var(--fg); text-anchor: middle; dominant-baseline: central; }
+.edge { animation: appear .5s ease-out; }
+.edge.tree line { stroke: var(--tree); stroke-width: 5; }
+.edge.path line { stroke: var(--accent); stroke-width: 7; }
+.edge.active line { stroke: var(--fg); stroke-width: 4; stroke-dasharray: 8 6; animation: dash .6s linear infinite; }
+.edge.lost line { stroke-dasharray: 3 6; }
+@keyframes dash { to { stroke-dashoffset: -14; } }
+@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popin { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.node { cursor: pointer; animation: popin .4s ease-out; transform-box: fill-box; transform-origin: center; }
+.node circle { stroke-width: 3; transition: fill .25s, stroke .25s; }
+.node .name { font-family: var(--font-display); font-weight: 700; font-size: 18px; text-anchor: middle; dominant-baseline: central; fill: var(--fg); pointer-events: none; }
+.node .dist { font-family: var(--font-mono); font-weight: 600; font-size: 15px; text-anchor: middle; dominant-baseline: central; fill: var(--fg); pointer-events: none; }
+.node.queue circle { fill: var(--queue); stroke: var(--queue-line); }
+.node.cloud circle { fill: var(--cloud); stroke: var(--cloud-line); }
+.node.now circle { fill: var(--now); stroke: var(--now-line); }
+.node.target circle { stroke: var(--fg); stroke-width: 5; }
+.node.lost circle { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 4; }
+.node.sel circle { stroke: var(--accent); stroke-width: 6; }
+.node:focus-visible circle { stroke: var(--accent); stroke-width: 6; }
+.node:focus { outline: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 16px; height: 16px; border-radius: 50%; border: 2px solid; display: inline-block; }
+.sw.queue { background: var(--queue); border-color: var(--queue-line); }
+.sw.now { background: var(--now); border-color: var(--now-line); }
+.sw.cloud { background: var(--cloud); border-color: var(--cloud-line); }
+.sw.tree { width: 22px; height: 0; border-radius: 0; border-width: 3px 0 0; border-color: var(--tree); }
+
+/* Decisión */
+.decision { display: grid; gap: 10px; }
+.fb { border-radius: 8px; padding: 8px 12px; font-size: 0.97rem; }
+.fb.ok { background: var(--ok-soft); color: var(--fg); }
+.fb.bad { background: var(--bad-soft); color: var(--fg); }
+.fb b.t { color: var(--ok); }
+.fb.bad b.t { color: var(--bad); }
+.ask { font-size: 1.08rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fact { background: var(--sunken); border-radius: 8px; padding: 6px 12px; display: grid; min-width: 86px; }
+.fact small { font-size: 0.78rem; color: var(--muted); }
+.fact b { font-family: var(--font-mono); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.answer { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.answer input { width: 110px; font-family: var(--font-mono); font-size: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Tabla */
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+thead th { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+td.num { font-family: var(--font-mono); font-weight: 600; }
+tr.changed td.num { background: var(--code-hl); }
+.state { display: inline-flex; align-items: center; gap: 6px; }
+.empty { color: var(--muted); font-style: italic; font-size: 0.92rem; }
+
+ol.log { margin: 0; padding-left: 1.5em; display: grid; gap: 4px; font-size: 0.93rem; max-height: 230px; overflow-y: auto; }
+ol.log span { color: var(--muted); }
+
+pre.code { margin: 0; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.7; background: var(--sunken); border-radius: 8px; padding: 10px 0; overflow-x: auto; }
+pre.code .ln { display: block; padding-right: 12px; white-space: pre; border-left: 4px solid transparent; transition: background .2s; }
+pre.code .ln i { font-style: normal; display: inline-block; width: 2.4em; text-align: right; padding-right: 10px; color: var(--muted); user-select: none; }
+pre.code .ln.hl { background: var(--code-hl); border-left-color: var(--accent); }
+
+.tips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.tip { border-top: 3px solid var(--line); padding-top: 12px; display: grid; gap: 6px; align-content: start; }
+.tip p { font-size: 0.97rem; }
+
+@media (max-width: 880px) {
+  .grid, .tips { grid-template-columns: minmax(0, 1fr); }
+  .stats { margin-left: 0; }
+}
+@media (max-width: 620px) { body { font-size: 16px; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Estructuras de Datos · Capítulo 14 · Caminos más cortos</div>
+    <h1>Laboratorio Dijkstra</h1>
+    <p class="lead">Aquí el grafo empieza oculto. Solo conoces el vértice inicial, y cada vez que un vértice sale de la cola aparecen sus aristas y sus vecinos. Tú decides quién sale y tú actualizas cada distancia.</p>
+  </header>
+
+  <section class="col" aria-label="Simulador">
+    <div class="toolbar">
+      <div class="field">
+        <label class="lbl" for="preset">Grafo</label>
+        <select id="preset">
+          <option value="cuaderno">Grafo del cuaderno</option>
+          <option value="waze">Ruta de la casa a la U</option>
+          <option value="practica">Práctica a mano</option>
+          <option value="aislado">Con una zona aislada</option>
+          <option value="azar">Al azar</option>
+        </select>
+      </div>
+      <button class="btn" id="b-other" type="button" hidden>Otro grafo al azar</button>
+      <div class="stats" aria-live="off">
+        <span>Descubiertos <b id="s-seen">1</b></span>
+        <span>En la nube <b id="s-cloud">0</b></span>
+        <span>Errores <b id="s-err">0</b></span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <div class="panel">
+          <div class="graph-box"><svg class="graph" id="graph" viewBox="0 0 600 420" role="group" aria-label="Grafo descubierto hasta ahora"></svg></div>
+          <div class="legend">
+            <span><i class="sw queue"></i>en la cola</span>
+            <span><i class="sw now"></i>acaba de salir</span>
+            <span><i class="sw cloud"></i>en la nube, d definitiva</span>
+            <span><i class="sw tree"></i>mejor arista conocida</span>
+          </div>
+        </div>
+        <div class="panel decision">
+          <div id="fb" class="fb" hidden></div>
+          <div id="ask" class="ask" aria-live="polite"></div>
+          <div id="facts" class="facts" hidden></div>
+          <form id="answer" class="answer" hidden>
+            <div class="field">
+              <label class="lbl" id="ans-lbl" for="ans">Nuevo d</label>
+              <input id="ans" type="text" inputmode="numeric" autocomplete="off">
+            </div>
+            <button class="btn primary" type="submit">Guardar valor</button>
+            <button class="btn" id="b-same" type="button">Se queda igual</button>
+          </form>
+          <div class="controls">
+            <button class="btn" id="b-auto" type="button">Hacer este paso por mí</button>
+            <button class="btn" id="b-undo" type="button">Deshacer</button>
+            <button class="btn" id="b-reset" type="button">Reiniciar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="panel">
+          <h3>Tabla de distancias</h3>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Vértice</th><th>d</th><th>Viene de</th><th>Estado</th></tr></thead>
+              <tbody id="table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Bitácora</h3>
+          <div id="log-box"></div>
+        </div>
+        <div class="panel">
+          <h3>Código de Goodrich</h3>
+          <pre class="code" id="code"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2>Qué observar</h2>
+    <div class="tips">
+      <div class="tip"><h3>Grafo del cuaderno</h3><p>Fíjate en <b>B</b>: primero recibe 4 por la arista directa desde A. Luego baja a 3, porque ir por C resulta más barato aunque use más aristas.</p></div>
+      <div class="tip"><h3>Ruta de la casa a la U</h3><p>La calle <b>A–C</b> tiene un trancón de 25 minutos. Mira si esa arista termina en rojo. Al final, haz clic en <b>U</b> para ver la ruta.</p></div>
+      <div class="tip"><h3>Con una zona aislada</h3><p>Dijkstra solo descubre lo que puede alcanzar. Cuando se vacíe la parte conocida, aparecerán los vértices que nunca tocaste.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const INF = Infinity;
+const PRESETS = {
+  cuaderno: {
+    start: 'A',
+    nodes: { A:[70,210], B:[190,60], C:[190,360], D:[340,210], E:[440,360], F:[540,210] },
+    edges: [['A','B',4],['A','C',2],['B','C',1],['B','D',5],['C','D',8],['C','E',10],['D','E',2],['D','F',6],['E','F',3]]
+  },
+  waze: {
+    start: 'Casa',
+    nodes: { Casa:[60,210], A:[210,70], B:[210,350], C:[400,70], D:[400,350], U:[540,210] },
+    edges: [['Casa','A',7],['Casa','B',4],['A','B',2],['A','C',25],['B','D',6],['C','D',8],['C','U',3],['D','U',9]]
+  },
+  practica: {
+    start: '0',
+    nodes: { 0:[300,45], 1:[250,150], 2:[430,150], 3:[60,190], 4:[540,190], 5:[230,300], 6:[430,300], 7:[230,385] },
+    edges: [['0','1',5],['0','3',7],['0','4',2],['1','2',7],['1','5',2],['1','6',5,.3],['2','5',5,.3],['3','5',7],['4','6',8],['5','7',3]]
+  },
+  aislado: {
+    start: 'A',
+    nodes: { A:[80,110], B:[240,60], C:[240,250], D:[80,310], E:[390,160], X:[440,340], Y:[550,240] },
+    edges: [['A','B',3],['B','C',4],['A','D',7],['C','D',2],['C','E',6],['B','E',9],['X','Y',1]]
+  }
+};
+
+// Cuadrícula con desplazamientos pequeños y una sola diagonal por celda: las aristas no se cruzan.
+function grafoAlAzar() {
+  const cols = 4, rows = 3, nodes = {}, id = (r, c) => String.fromCharCode(65 + r * cols + c);
+  const azar = n => Math.floor(Math.random() * n);
+  const cand = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    nodes[id(r, c)] = [85 + c * 143 + azar(37) - 18, 70 + r * 140 + azar(37) - 18];
+    if (c + 1 < cols) cand.push([id(r, c), id(r, c + 1)]);
+    if (r + 1 < rows) cand.push([id(r, c), id(r + 1, c)]);
+    if (c + 1 < cols && r + 1 < rows && azar(3) === 0) cand.push(azar(2) ? [id(r, c), id(r + 1, c + 1)] : [id(r, c + 1), id(r + 1, c)]);
+  }
+  // Árbol generador primero, para que el grafo quede conexo; el resto de aristas entra con probabilidad 1/2.
+  const raiz = Object.fromEntries(Object.keys(nodes).map(n => [n, n]));
+  const buscar = n => raiz[n] === n ? n : (raiz[n] = buscar(raiz[n]));
+  const elegidas = [];
+  cand.map(e => [Math.random(), e]).sort((a, b) => a[0] - b[0]).forEach(([, [a, b]]) => {
+    const ra = buscar(a), rb = buscar(b);
+    if (ra !== rb) { raiz[ra] = rb; elegidas.push([a, b]); }
+    else if (azar(2)) elegidas.push([a, b]);
+  });
+  return { start: 'A', nodes, edges: elegidas.map(([a, b]) => [a, b, 1 + azar(12)]) };
+}
+
+const CODE = [
+  'while not pq.is_empty():',
+  '  key, u = pq.remove_min()',
+  '  cloud[u] = key',
+  '  for e in g.incident_edges(u):',
+  '    v = e.opposite(u)',
+  '    if v not in cloud:',
+  '      wgt = e.element()',
+  '      if d[u] + wgt < d[v]:',
+  '        d[v] = d[u] + wgt',
+  '        pq.update(pqlocator[v], d[v], v)'
+];
+
+const $ = s => document.querySelector(s);
+const fmt = x => x === INF ? '∞' : String(x);
+const SVGNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+let G = null;       // grafo actual
+let S = null;       // estado de la simulación
+let historial = []; // copias de S para Deshacer
+
+function nuevoEstado() {
+  const d = {};
+  Object.keys(G.nodes).forEach(n => d[n] = INF);
+  d[G.start] = 0;
+  return {
+    d, parent: {}, cloud: [], seen: [G.start], known: [], phase: 'pick', cur: null, queue: [],
+    log: [], mistakes: 0, errs: 0, fb: null, sel: null, changed: null
+  };
+}
+
+function cargar(preset) {
+  G = preset === 'azar' ? grafoAlAzar() : PRESETS[preset];
+  $('#b-other').hidden = preset !== 'azar';
+  reiniciar();
+}
+
+function reiniciar() {
+  S = nuevoEstado();
+  historial = [];
+  dibujar();
+  render();
+}
+
+function otro(i, v) { return G.edges[i][0] === v ? G.edges[i][1] : G.edges[i][0]; }
+function guardar() { historial.push(structuredClone(S)); }
+
+function dibujar() {
+  const svg = $('#graph');
+  svg.innerHTML = '';
+  const ge = el('g', {}, svg), gn = el('g', {}, svg);
+  G.edges.forEach(([a, b, w, t = .5], i) => {
+    const [x1, y1] = G.nodes[a], [x2, y2] = G.nodes[b];
+    const g = el('g', { class: 'edge hide', 'data-i': i }, ge);
+    el('line', { x1, y1, x2, y2 }, g);
+    const lx = x1 + (x2 - x1) * t, ly = y1 + (y2 - y1) * t;
+    el('rect', { x: lx - 14, y: ly - 11, width: 28, height: 22, rx: 5 }, g);
+    el('text', { x: lx, y: ly }, g).textContent = w;
+  });
+  Object.entries(G.nodes).forEach(([n, [x, y]]) => {
+    const g = el('g', { class: 'node hide', 'data-n': n, tabindex: 0, role: 'button' }, gn);
+    el('circle', { cx: x, cy: y, r: 27 }, g);
+    el('text', { x, y: y - 8, class: 'name' }, g).textContent = n;
+    el('text', { x, y: y + 11, class: 'dist' }, g);
+    g.addEventListener('click', () => elegir(n));
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); elegir(n); } });
+  });
+}
+
+function minimoCola() {
+  return Math.min(...S.seen.filter(n => !S.cloud.includes(n)).map(n => S.d[n]));
+}
+
+function elegir(n) {
+  if (S.phase === 'done') { S.sel = n; S.fb = null; render(); return; }
+  if (S.phase === 'relax') {
+    S.fb = { ok: false, html: `Primero termina de revisar la arista marcada. Falta decidir el valor de <b>d[${otro(S.queue[0], S.cur)}]</b>.` };
+    render(); return;
+  }
+  if (S.cloud.includes(n)) {
+    S.fb = { ok: false, html: `<b>${n}</b> ya está en la nube. Su distancia es definitiva y no vuelve a salir.` };
+    render(); return;
+  }
+  const min = minimoCola();
+  if (S.d[n] > min) {
+    S.mistakes++; S.errs++;
+    const quien = S.seen.filter(x => !S.cloud.includes(x) && S.d[x] === min);
+    S.fb = { ok: false, html: S.errs >= 2
+      ? `<b>${n}</b> tiene d = ${fmt(S.d[n])}, pero <b>${quien.join(' o ')}</b> tiene d = ${min}. Sale siempre el menor.`
+      : `<b>${n}</b> tiene d = ${fmt(S.d[n])}, y en la cola hay un vértice con d menor. Compara los vértices azules.` };
+    render(); return;
+  }
+  sacar(n);
+}
+
+function sacar(u) {
+  guardar();
+  S.cloud.push(u);
+  S.cur = u;
+  S.errs = 0; S.sel = null; S.changed = null;
+  const nuevos = [], pend = [];
+  G.edges.forEach((e, i) => {
+    if (e[0] !== u && e[1] !== u) return;
+    if (!S.known.includes(i)) S.known.push(i);
+    const v = otro(i, u);
+    if (!S.seen.includes(v)) { S.seen.push(v); nuevos.push(v); }
+    if (!S.cloud.includes(v)) pend.push(i);
+  });
+  S.queue = pend;
+  S.log.push({ u, d: S.d[u], nuevos, cambios: [] });
+  let html = `<b>${u}</b> sale con d = ${S.d[u]}. Esa distancia ya es definitiva.`;
+  html += nuevos.length ? ` Descubriste ${nuevos.length === 1 ? 'el vértice' : 'los vértices'} <b>${nuevos.join(', ')}</b>.` : ' No aparecieron vértices nuevos.';
+  S.fb = { ok: true, html };
+  if (pend.length) S.phase = 'relax'; else terminarRelajacion();
+  render();
+}
+
+function terminarRelajacion() {
+  S.cur = null;
+  if (S.seen.every(n => S.cloud.includes(n))) S.phase = 'done';
+  else S.phase = 'pick';
+}
+
+function responder(val) {
+  const i = S.queue[0], u = S.cur, v = otro(i, u), w = G.edges[i][2];
+  const cand = S.d[u] + w, antes = S.d[v], mejora = cand < antes;
+  const correcto = mejora ? val === cand : val === antes;
+  if (!correcto) {
+    S.mistakes++; S.errs++;
+    let html;
+    if (mejora && val === antes) html = `Sí hay mejora. Calcula d[${u}] + ${w} y compáralo con ${fmt(antes)}.`;
+    else if (!mejora && val === cand) html = `Ese camino cuesta ${cand}, y ya conoces uno de ${fmt(antes)}. Cuando no mejora, d[${v}] no cambia.`;
+    else if (S.errs >= 2) html = `${S.d[u]} + ${w} = ${cand}. ${mejora ? `Es menor que ${fmt(antes)}, así que d[${v}] debe ser ${cand}.` : `No es menor que ${fmt(antes)}, así que d[${v}] se queda igual.`}`;
+    else html = `Ese valor no es correcto. Suma d[${u}] y el peso de la arista, y quédate con el menor entre ese resultado y ${fmt(antes)}.`;
+    S.fb = { ok: false, html };
+    render();
+    return;
+  }
+  guardar();
+  S.errs = 0;
+  const entrada = S.log[S.log.length - 1];
+  if (mejora) {
+    S.d[v] = cand; S.parent[v] = u; S.changed = v;
+    entrada.cambios.push(`${v}: ${fmt(antes)} → ${cand}`);
+    S.fb = { ok: true, html: `${S.d[u]} + ${w} = ${cand}, menor que ${fmt(antes)}. Ahora <b>d[${v}] = ${cand}</b> y se llega a ${v} desde ${u}.` };
+  } else {
+    S.changed = null;
+    S.fb = { ok: true, html: `${S.d[u]} + ${w} = ${cand}, que no es menor que ${fmt(antes)}. <b>d[${v}]</b> se queda igual.` };
+  }
+  S.queue.shift();
+  if (!S.queue.length) terminarRelajacion();
+  $('#ans').value = '';
+  render();
+}
+
+function auto() {
+  if (S.phase === 'pick') sacar(S.seen.find(n => !S.cloud.includes(n) && S.d[n] === minimoCola()));
+  else if (S.phase === 'relax') {
+    const i = S.queue[0], v = otro(i, S.cur);
+    responder(Math.min(S.d[S.cur] + G.edges[i][2], S.d[v]));
+  }
+}
+
+function caminoHasta(n) {
+  if (S.d[n] === INF) return null;
+  const r = [n];
+  while (r[0] !== G.start) r.unshift(S.parent[r[0]]);
+  return r;
+}
+
+function preguntar() {
+  const facts = $('#facts'), form = $('#answer'), ask = $('#ask');
+  facts.hidden = form.hidden = S.phase !== 'relax';
+  if (S.phase === 'pick') {
+    ask.innerHTML = S.cloud.length === 0
+      ? `Empieza por el vértice inicial. Haz clic en <b>${G.start}</b>, que tiene d = 0.`
+      : '¿Qué vértice sale ahora de la cola? Haz clic en el vértice azul con <b>menor d</b>.';
+  } else if (S.phase === 'relax') {
+    const i = S.queue[0], u = S.cur, v = otro(i, u), w = G.edges[i][2];
+    ask.innerHTML = `Revisa la arista <b>${u}–${v}</b>. ¿Cuánto debe valer <b>d[${v}]</b> después de relajarla?`;
+    facts.innerHTML = [[`d[${u}]`, S.d[u]], [`peso ${u}–${v}`, w], [`d[${v}] actual`, fmt(S.d[v])]]
+      .map(([a, b]) => `<div class="fact"><small>${a}</small><b>${b}</b></div>`).join('');
+    $('#ans-lbl').textContent = `Nuevo d[${v}]`;
+  } else {
+    const perdidos = Object.keys(G.nodes).filter(n => !S.seen.includes(n));
+    let html = `<b>Terminaste.</b> La cola quedó sin vértices alcanzables y cometiste ${S.mistakes} ${S.mistakes === 1 ? 'error' : 'errores'}.`;
+    if (perdidos.length) html += ` Los vértices <b>${perdidos.join(', ')}</b> nunca se descubrieron: no hay camino hasta ellos, y su distancia sigue en ∞.`;
+    if (S.sel) {
+      const r = caminoHasta(S.sel);
+      html += r ? ` Camino a <b>${S.sel}</b>: <b>${r.join(' → ')}</b>, con costo ${S.d[S.sel]}.` : ` No hay camino hasta <b>${S.sel}</b>.`;
+    } else html += ' Haz clic en un vértice para ver su camino más corto.';
+    ask.innerHTML = html;
+  }
+}
+
+function render() {
+  const done = S.phase === 'done';
+  const activa = S.phase === 'relax' ? S.queue[0] : null;
+  const target = activa !== null ? otro(activa, S.cur) : null;
+  const camino = done && S.sel ? caminoHasta(S.sel) : null;
+  const enCamino = new Set();
+  if (camino) camino.slice(1).forEach((n, k) => enCamino.add([camino[k], n].sort().join('|')));
+
+  document.querySelectorAll('#graph .edge').forEach(g => {
+    const i = +g.dataset.i, [a, b] = G.edges[i];
+    const visible = S.known.includes(i) || done;
+    let c = 'edge';
+    if (!visible) c += ' hide';
+    if (S.parent[a] === b || S.parent[b] === a) c += ' tree';
+    if (!S.known.includes(i)) c += ' lost';
+    if (i === activa) c += ' active';
+    if (enCamino.has([a, b].sort().join('|'))) c += ' path';
+    g.setAttribute('class', c);
+  });
+  document.querySelectorAll('#graph .node').forEach(g => {
+    const n = g.dataset.n;
+    const visto = S.seen.includes(n);
+    let c = 'node';
+    if (!visto && !done) c += ' hide';
+    if (!visto) c += ' lost';
+    else if (n === S.cur) c += ' now';
+    else c += S.cloud.includes(n) ? ' cloud' : ' queue';
+    if (n === target) c += ' target';
+    if (done && n === S.sel) c += ' sel';
+    g.setAttribute('class', c);
+    g.querySelector('.dist').textContent = fmt(S.d[n]);
+    g.setAttribute('aria-label', `Vértice ${n}, distancia ${fmt(S.d[n])}`);
+  });
+
+  const fb = $('#fb');
+  fb.hidden = !S.fb;
+  if (S.fb) {
+    fb.className = 'fb ' + (S.fb.ok ? 'ok' : 'bad');
+    fb.innerHTML = `<b class="t">${S.fb.ok ? 'Bien.' : 'Revisa.'}</b> ${S.fb.html}`;
+  }
+  preguntar();
+
+  $('#s-seen').textContent = S.seen.length;
+  $('#s-cloud').textContent = S.cloud.length;
+  $('#s-err').textContent = S.mistakes;
+
+  const orden = done ? [...S.seen, ...Object.keys(G.nodes).filter(n => !S.seen.includes(n))] : S.seen;
+  $('#table').innerHTML = orden.map(n => {
+    const visto = S.seen.includes(n);
+    const clase = !visto ? '' : n === S.cur ? 'now' : S.cloud.includes(n) ? 'cloud' : 'queue';
+    const texto = !visto ? 'sin camino' : n === S.cur ? 'acaba de salir' : S.cloud.includes(n) ? 'en la nube' : 'en la cola';
+    return `<tr class="${n === S.changed ? 'changed' : ''}"><th scope="row">${n}</th><td class="num">${fmt(S.d[n])}</td><td>${S.parent[n] ?? '–'}</td><td><span class="state">${clase ? `<i class="sw ${clase}"></i>` : ''}${texto}</span></td></tr>`;
+  }).join('');
+
+  $('#log-box').innerHTML = S.log.length
+    ? '<ol class="log">' + S.log.map(l => `<li>Sale <b>${l.u}</b> con d = ${l.d}.${l.nuevos.length ? ` <span>Descubre ${l.nuevos.join(', ')}.</span>` : ''}${l.cambios.length ? ` ${l.cambios.join(', ')}` : ''}</li>`).join('') + '</ol>'
+    : '<p class="empty">Aquí quedará cada paso que hagas.</p>';
+  const lista = $('#log-box ol');
+  if (lista) lista.scrollTop = lista.scrollHeight;
+
+  const lineas = S.phase === 'pick' ? [1, 2, 3] : S.phase === 'relax' ? [4, 5, 6, 7, 8, 9, 10] : [1];
+  document.querySelectorAll('#code .ln').forEach(l => l.classList.toggle('hl', lineas.includes(+l.dataset.l)));
+
+  $('#b-auto').disabled = done;
+  $('#b-undo').disabled = !historial.length;
+  $('#b-reset').disabled = !historial.length;
+  if (S.phase === 'relax') $('#ans').focus({ preventScroll: true });
+}
+
+$('#code').innerHTML = CODE.map((l, i) => `<span class="ln" data-l="${i + 1}"><i>${i + 1}</i>${l.replace(/</g, '&lt;')}</span>`).join('');
+$('#answer').addEventListener('submit', e => {
+  e.preventDefault();
+  const crudo = $('#ans').value.trim().toLowerCase();
+  if (crudo === '') { S.fb = { ok: false, html: 'Escribe un número, o usa «Se queda igual» si no hay mejora.' }; render(); return; }
+  const val = ['∞', 'inf', 'infinito'].includes(crudo) ? INF : Number(crudo);
+  if (Number.isNaN(val)) { S.fb = { ok: false, html: `«${$('#ans').value.replace(/[<&]/g, '')}» no es un número. Escribe solo el valor de la distancia.` }; render(); return; }
+  responder(val);
+});
+$('#b-same').addEventListener('click', () => responder(S.d[otro(S.queue[0], S.cur)]));
+$('#b-auto').addEventListener('click', auto);
+$('#b-undo').addEventListener('click', () => { if (historial.length) { S = historial.pop(); $('#ans').value = ''; render(); } });
+$('#b-reset').addEventListener('click', reiniciar);
+$('#b-other').addEventListener('click', () => cargar('azar'));
+$('#preset').addEventListener('change', e => cargar(e.target.value));
+
+cargar('cuaderno');
+</script>
+
+</body></html>
